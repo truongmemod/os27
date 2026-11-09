@@ -29,11 +29,23 @@ jobs:
         run: |
           git clone --depth=1 https://github.com/theos/sdks.git /tmp/sdks
           mkdir -p $THEOS/sdks
-          cp -R /tmp/sdks/*.sdk $THEOS/sdks/
-          ls $THEOS/sdks
-          SDKVER=$(ls $THEOS/sdks | grep '^iPhoneOS' | sed 's/iPhoneOS//; s/\.sdk//' | sort -V | head -1)
-          echo "Using SDK $SDKVER"
-          echo "SDKVER=$SDKVER" >> $GITHUB_ENV
+          rm -rf $THEOS/sdks/iPhoneOS9.3.sdk
+          cp -R /tmp/sdks/iPhoneOS9.3.sdk $THEOS/sdks/
+          # SDK 9.3 thiếu liblaunch.tbd -> tạo stub để linker không lỗi
+          cat > $THEOS/sdks/iPhoneOS9.3.sdk/usr/lib/system/liblaunch.tbd <<'TBD'
+          ---
+          archs:                 [ armv7, armv7s, arm64, i386, x86_64 ]
+          platform:              ios
+          install-name:          /usr/lib/system/liblaunch.dylib
+          current-version:       1
+          compatibility-version: 1
+          exports:
+            - archs:              [ armv7, armv7s, arm64, i386, x86_64 ]
+              symbols:            [ _launch_stub_unused ]
+          ...
+          TBD
+          sed -i 's/^          //' $THEOS/sdks/iPhoneOS9.3.sdk/usr/lib/system/liblaunch.tbd
+          echo "SDKVER=9.3" >> $GITHUB_ENV
 
       - name: Build .deb
         run: |
