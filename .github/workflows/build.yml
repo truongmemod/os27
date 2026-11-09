@@ -19,17 +19,26 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential fakeroot rsync curl perl git libxml2 dpkg-dev bzip2 gzip xz-utils
 
-      - name: Install Theos (toolchain + SDKs)
+      - name: Install Theos (toolchain)
         run: |
           export THEOS=$HOME/theos
           echo "THEOS=$THEOS" >> $GITHUB_ENV
           yes | bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)" || true
-          ls $THEOS/sdks || true
+
+      - name: Get iOS SDK
+        run: |
+          git clone --depth=1 https://github.com/theos/sdks.git /tmp/sdks
+          mkdir -p $THEOS/sdks
+          cp -R /tmp/sdks/*.sdk $THEOS/sdks/
+          ls $THEOS/sdks
+          SDKVER=$(ls $THEOS/sdks | grep '^iPhoneOS' | sed 's/iPhoneOS//; s/\.sdk//' | sort -V | head -1)
+          echo "Using SDK $SDKVER"
+          echo "SDKVER=$SDKVER" >> $GITHUB_ENV
 
       - name: Build .deb
         run: |
           cd tweak
-          make clean package FINALPACKAGE=1
+          make clean package FINALPACKAGE=1 TARGET=iphone:clang:$SDKVER:6.0
 
       - name: Update repo files
         run: |
@@ -46,4 +55,3 @@ jobs:
           git add -A debs Packages Packages.bz2 Packages.gz
           git diff --cached --quiet || git commit -m "Update repo [skip ci]"
           git push
-
