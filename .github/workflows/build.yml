@@ -1,1 +1,49 @@
+name: Build and update repo
+on:
+  push:
+    branches: [main]
+    paths: ['tweak/**', '.github/workflows/build.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential fakeroot rsync curl perl git libxml2 dpkg-dev bzip2 gzip xz-utils
+
+      - name: Install Theos (toolchain + SDKs)
+        run: |
+          export THEOS=$HOME/theos
+          echo "THEOS=$THEOS" >> $GITHUB_ENV
+          yes | bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)" || true
+          ls $THEOS/sdks || true
+
+      - name: Build .deb
+        run: |
+          cd tweak
+          make clean package FINALPACKAGE=1
+
+      - name: Update repo files
+        run: |
+          rm -f debs/*.deb
+          cp tweak/packages/*.deb debs/
+          dpkg-scanpackages -m debs /dev/null > Packages
+          bzip2 -kf Packages
+          gzip -kf Packages
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add -A debs Packages Packages.bz2 Packages.gz
+          git diff --cached --quiet || git commit -m "Update repo [skip ci]"
+          git push
 
