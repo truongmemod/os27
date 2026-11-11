@@ -52,7 +52,11 @@ jobs:
           mkdir -p ipas ipa_debs
           for f in ipas/*.ipa; do
             [ -e "$f" ] || continue
-            bash tools/ipa2deb.sh "$f" ipa_debs
+            if unzip -tq "$f" >/dev/null 2>&1; then
+              bash tools/ipa2deb.sh "$f" ipa_debs || echo "::warning::Không đóng gói được $f"
+            else
+              echo "::warning::Bỏ qua $f vì không phải file IPA hợp lệ"
+            fi
           done
 
       - name: Update repo files
